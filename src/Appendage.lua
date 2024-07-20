@@ -189,6 +189,7 @@ export type Appendage = {
     AddConstraints: (self: Appendage, PresetName: string, Character: Model) -> (),
     Enable: (self: Appendage) -> (),
     Disable: (self: Appendage) -> (),
+    SetTargetAttachment: (self: Appendage, Target: Attachment?) -> (),
     SetSmoothTime: (self: Appendage, SmoothTime: number) -> (),
     MoveTo: (self: Appendage, Target: CFrame, TweenInfoObject: TweenInfo?) -> (),
     MoveToWorld: (self: Appendage, Target: CFrame, TweenInfoObject: TweenInfo?) -> (),
@@ -332,6 +333,14 @@ Disables the appendage.
 --]]
 function Appendage:Disable(): ()
     self.IKControl.Weight = 0
+end
+
+--[[
+Sets the target attachment for the IKControl.
+MoveTo and MoveToWorld will not work when a target attachment is set.
+--]]
+function Appendage:SetTargetAttachment(Target: Attachment?): ()
+    self.IKControl.Target = Target or self.IKControlAttachment
 end
 
 --[[
