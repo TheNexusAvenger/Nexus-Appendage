@@ -1,8 +1,4 @@
---[[
-TheNexusAvenger
-
-Manages an appendage for a character, such as an arm or a leg.
---]]
+--Manages an appendage for a character, such as an arm or a leg.
 --!strict
 
 local TweenService = game:GetService("TweenService")
@@ -182,19 +178,22 @@ Appendage.__index = Appendage
 setmetatable(Appendage, Limb)
 
 export type Appendage = {
-    new: (Humanoid: Humanoid, RootPart: BasePart, UpperLimb: BasePart, LowerLimb: BasePart, LimbEnd: BasePart, StartMotor: string, StartAttachment: string, LimbJointAttachment: string, LimbEndAttachment: string, LimbHoldAttachment: string, AllowDisconnection: boolean?, SmoothTime: number?) -> (Appendage),
-    FromPreset: (PresetName: string, Character: Model, AllowDisconnection: boolean?, SmoothTime: number?) -> (Appendage),
-
+    Destroyed: boolean,
+    ActiveTweens: {[Instance]: Tween},
+    RootPart: BasePart,
+    UpperLimb: BasePart,
+    LowerLimb: BasePart,
+    LimbEnd: BasePart,
+    StartMotor: Motor6D,
+    StartAttachment: string,
+    LimbJointAttachment: string,
+    LimbEndAttachment: string,
+    LimbHoldAttachment: string,
+    AllowDisconnection: boolean,
+    IKControlAttachment: Attachment,
     IKControl: IKControl,
-    AddConstraints: (self: Appendage, PresetName: string, Character: Model) -> (),
-    Enable: (self: Appendage) -> (),
-    Disable: (self: Appendage) -> (),
-    SetTargetAttachment: (self: Appendage, Target: Attachment?) -> (),
-    SetSmoothTime: (self: Appendage, SmoothTime: number) -> (),
-    MoveTo: (self: Appendage, Target: CFrame, TweenInfoObject: TweenInfo?) -> (),
-    MoveToWorld: (self: Appendage, Target: CFrame, TweenInfoObject: TweenInfo?) -> (),
-    Destroy: (self: Appendage) -> (),
-} & Limb.Limb
+    Constraints: {Instance},
+} & typeof(setmetatable({},Appendage )) &  Limb.Limb
 
 
 
@@ -203,14 +202,14 @@ Creates an appendage.
 --]]
 function Appendage.new(Humanoid: Humanoid, RootPart: BasePart, UpperLimb: BasePart, LowerLimb: BasePart, LimbEnd: BasePart, StartMotor: string, StartAttachment: string, LimbJointAttachment: string, LimbEndAttachment: string, LimbHoldAttachment: string, AllowDisconnection: boolean?, SmoothTime: number?): Appendage
     --Store the parts.
-    local self = setmetatable(Limb.new(), Appendage) :: any
+    local self = setmetatable(Limb.new() :: any, Appendage) :: Appendage
     self.Destroyed = false
     self.ActiveTweens = {}
     self.RootPart = RootPart
     self.UpperLimb = UpperLimb
     self.LowerLimb = LowerLimb
     self.LimbEnd = LimbEnd
-    self.StartMotor = UpperLimb:WaitForChild(StartMotor)
+    self.StartMotor = UpperLimb:WaitForChild(StartMotor) :: Motor6D
     self.StartAttachment = StartAttachment
     self.LimbJointAttachment = LimbJointAttachment
     self.LimbEndAttachment = LimbEndAttachment
@@ -382,7 +381,7 @@ end
 --[[
 Destroys the appendage.
 --]]
-function Appendage:Destroy()
+function Appendage:Destroy(): ()
     self.Destroyed = true
 
     --Reset the properties.
@@ -403,4 +402,4 @@ end
 
 
 
-return (Appendage :: any) :: Appendage
+return Appendage

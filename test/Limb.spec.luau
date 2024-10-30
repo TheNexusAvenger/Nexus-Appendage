@@ -1,8 +1,4 @@
---[[
-TheNexusAvenger
-
-Tests the Limb class.
---]]
+--Tests the Limb class.
 --!strict
 
 local Limb = require(game:GetService("ReplicatedStorage"):WaitForChild("NexusAppendage"):WaitForChild("Limb"))
