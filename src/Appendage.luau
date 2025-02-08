@@ -1,9 +1,8 @@
 --Manages an appendage for a character, such as an arm or a leg.
 --!strict
 
-local TweenService = game:GetService("TweenService")
-
 local Limb = require(script.Parent:WaitForChild("Limb"))
+local JointOffset = require(script.Parent:WaitForChild("JointOffset"))
 
 local Appendage = {}
 Appendage.Presets = {
@@ -234,13 +233,11 @@ Appendage.__index = Appendage
 setmetatable(Appendage, Limb)
 
 export type Appendage = {
-    Destroyed: boolean,
-    ActiveTweens: {[Instance]: {[string]: Tween}},
     RootPart: BasePart,
     UpperLimb: BasePart,
     LowerLimb: BasePart,
     LimbEnd: BasePart,
-    StartMotor: Motor6D | AnimationConstraint,
+    StartJointOffset: JointOffset.JointOffset,
     StartAttachment: string,
     LimbJointAttachment: string,
     LimbEndAttachment: string,
@@ -259,24 +256,17 @@ Creates an appendage.
 function Appendage.new(Humanoid: Humanoid, RootPart: BasePart, UpperLimb: BasePart, LowerLimb: BasePart, LimbEnd: BasePart, StartMotor: string, StartAttachment: string, LimbJointAttachment: string, LimbEndAttachment: string, LimbHoldAttachment: string, AllowDisconnection: boolean?, SmoothTime: number?): Appendage
     --Store the parts.
     local self = setmetatable(Limb.new() :: any, Appendage) :: Appendage
-    self.Destroyed = false
-    self.ActiveTweens = {}
     self.RootPart = RootPart
     self.UpperLimb = UpperLimb
     self.LowerLimb = LowerLimb
     self.LimbEnd = LimbEnd
-    self.StartMotor = UpperLimb:WaitForChild(StartMotor) :: Motor6D
+    self.StartJointOffset = JointOffset.new(UpperLimb:WaitForChild(StartMotor) :: Motor6D, RootPart, StartAttachment)
     self.StartAttachment = StartAttachment
     self.LimbJointAttachment = LimbJointAttachment
     self.LimbEndAttachment = LimbEndAttachment
     self.LimbHoldAttachment = LimbHoldAttachment
     self.AllowDisconnection = AllowDisconnection or false
     self.Constraints = {}
-
-    --Prepare the motor if it is a AnimationConstraint.
-    if self.StartMotor:IsA("AnimationConstraint") then
-        self.AllowDisconnection = false --TODO: Set up moving attachment instead.
-    end
 
     --Create arbitrary end attachments.
     if (LimbHoldAttachment == "LeftFootAttachment" or LimbHoldAttachment == "RightFootAttachment") and not LimbEnd:FindFirstChild(LimbHoldAttachment) then
@@ -324,23 +314,6 @@ function Appendage.FromPreset(PresetName: string, Character: Model, AllowDisconn
     local AppendageInstance = Appendage.new(Character:WaitForChild("Humanoid") :: Humanoid, Character:WaitForChild(Preset[1]) :: BasePart, Character:WaitForChild(Preset[2]) :: BasePart, Character:WaitForChild(Preset[3]) :: BasePart, Character:WaitForChild(Preset[4]) :: BasePart, Preset[5], Preset[6], Preset[7], Preset[8], Preset[9], AllowDisconnection, SmoothTime)
     AppendageInstance:AddConstraints(PresetName, Character)
     return AppendageInstance
-end
-
---[[
-Sets a property with an optional TweenInfo.
---]]
-function Appendage.SetProperty(self: Appendage, Ins: any, PropertyName: string, PropertyValue: any, TweenInfoObject: TweenInfo?): ()
-    if self.Destroyed then return end
-    if TweenInfoObject then
-        if not self.ActiveTweens[Ins] then self.ActiveTweens[Ins] = {} end
-        local Tween = TweenService:Create(Ins, TweenInfoObject, {
-            [PropertyName] = PropertyValue,
-        })
-        Tween:Play()
-        self.ActiveTweens[Ins][PropertyName] = Tween
-    else
-        Ins[PropertyName] = PropertyValue
-    end
 end
 
 --[[
@@ -421,8 +394,8 @@ attachment the upper limb rotates at.
 --]]
 function Appendage.MoveTo(self: Appendage, Target: CFrame, TweenInfoObject: TweenInfo?): ()
     --Move the target CFrame.
-    local StartAttachmentCFrame = self:GetAttachmentCFrame(self.RootPart, self.StartAttachment)
-    self:SetProperty(self.IKControlAttachment, "CFrame", StartAttachmentCFrame * Target, TweenInfoObject)
+    local StartAttachmentCFrame = self.StartJointOffset.AttachmentCFrame
+    self.StartJointOffset:SetProperty(self.IKControlAttachment, "CFrame", StartAttachmentCFrame * Target, TweenInfoObject)
 
     --Move the Motor6D if disconnection is allowed.
     if not self.AllowDisconnection then return end
@@ -430,9 +403,9 @@ function Appendage.MoveTo(self: Appendage, Target: CFrame, TweenInfoObject: Twee
     local AppendageLength = (self:GetAttachmentCFrame(self.UpperLimb, self.StartAttachment):Inverse() * self:GetAttachmentCFrame(self.UpperLimb, self.LimbJointAttachment) * self:GetAttachmentCFrame(self.LowerLimb, self.LimbJointAttachment):Inverse() * self:GetAttachmentCFrame(self.LowerLimb, self.LimbEndAttachment)).Position.Magnitude
     local TargetLength = TargetEndJointCFrame.Position.Magnitude
     if TargetLength > AppendageLength then
-        self:SetProperty(self.StartMotor, "C0", StartAttachmentCFrame * CFrame.new(CFrame.new(Vector3.zero, TargetEndJointCFrame.Position).LookVector * (TargetLength - AppendageLength)), TweenInfoObject)
+        self.StartJointOffset:SetOffset(CFrame.new(CFrame.new(Vector3.zero, TargetEndJointCFrame.Position).LookVector * (TargetLength - AppendageLength)), TweenInfoObject)
     else
-        self:SetProperty(self.StartMotor, "C0", StartAttachmentCFrame, TweenInfoObject)
+        self.StartJointOffset:SetOffset(CFrame.identity, TweenInfoObject)
     end
 end
 
@@ -440,7 +413,7 @@ end
 Moves the appendage target to the given CFrame in world space.
 --]]
 function Appendage.MoveToWorld(self: Appendage, Target: CFrame, TweenInfoObject: TweenInfo?): ()
-    local StartCFrame = self.RootPart.CFrame * self:GetAttachmentCFrame(self.RootPart, self.StartAttachment)
+    local StartCFrame = self.RootPart.CFrame * self.StartJointOffset.AttachmentCFrame
     self:MoveTo(StartCFrame:Inverse() * Target)
 end
 
@@ -448,19 +421,8 @@ end
 Destroys the appendage.
 --]]
 function Appendage.Destroy(self: Appendage): ()
-    self.Destroyed = true
-
-    --Reset the properties.
-    for _, Tweens in self.ActiveTweens do
-        for _, Tween in Tweens do
-            Tween:Cancel()
-        end
-    end
-    if self.StartMotor:IsA("Motor6D") then
-        self.StartMotor.C0 = self:GetAttachmentCFrame(self.RootPart, self.StartAttachment)
-    elseif self.StartMotor:IsA("AnimationConstraint") then
-        --TODO: Reset attachment.
-    end
+    --Clear the offset.
+    self.StartJointOffset:Destroy()
 
     --Clear the IKControl.
     self.IKControlAttachment:Destroy()
